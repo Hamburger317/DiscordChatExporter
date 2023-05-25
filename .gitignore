@@ -1,8 +1,9 @@
-# User-specific files
-.vs/
+*.userosscache
+*.sln.docstates
 .idea/
-*.suo
-*.user
+.vs/
+.vscode/
+test/
 
 # Build results
 bin/
