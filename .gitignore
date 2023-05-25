@@ -6,6 +6,7 @@
 .idea/
 .vs/
 .vscode/
+test/
 
 # Build results
 [Dd]ebug/
