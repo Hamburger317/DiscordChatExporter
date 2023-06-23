@@ -89,20 +89,20 @@ internal partial class HtmlMarkdownVisitor : MarkdownVisitor
         _buffer.Append(closingTag);
     }
 
-    protected override async ValueTask VisitHeaderAsync(
-        HeaderNode header,
+    protected override async ValueTask VisitHeadingAsync(
+        HeadingNode heading,
         CancellationToken cancellationToken = default)
     {
         _buffer.Append(
             // lang=html
-            $"<h{header.Level}>"
+            $"<h{heading.Level}>"
         );
 
-        await VisitAsync(header.Children, cancellationToken);
+        await VisitAsync(heading.Children, cancellationToken);
 
         _buffer.Append(
             // lang=html
-            $"</h{header.Level}>"
+            $"</h{heading.Level}>"
         );
     }
 
@@ -249,12 +249,12 @@ internal partial class HtmlMarkdownVisitor : MarkdownVisitor
 
             var member = mention.TargetId?.Pipe(_context.TryGetMember);
             var fullName = member?.User.FullName ?? "Unknown";
-            var nick = member?.Nick ?? member?.User.Name ?? "Unknown";
+            var displayName = member?.DisplayName ?? member?.User.DisplayName ?? "Unknown";
 
             _buffer.Append(
                 // lang=html
                 $"""
-                <span class="chatlog__markdown-mention" title="{HtmlEncode(fullName)}">@{HtmlEncode(nick)}</span>
+                <span class="chatlog__markdown-mention" title="{HtmlEncode(fullName)}">@{HtmlEncode(displayName)}</span>
                 """
             );
         }
