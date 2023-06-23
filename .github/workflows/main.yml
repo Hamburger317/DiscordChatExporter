@@ -5,6 +5,8 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: windows-latest
+    permissions:
+      contents: read
 
     env:
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
@@ -29,6 +31,7 @@ jobs:
           --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true"
           --collect:"XPlat Code Coverage"
           --
+          RunConfiguration.CollectSourceInformation=true
           DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
@@ -38,9 +41,12 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  package:
+  pack:
     needs: test
     runs-on: windows-latest
+    permissions:
+      actions: write
+      contents: read
 
     env:
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
@@ -82,8 +88,11 @@ jobs:
 
   deploy:
     if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
-    needs: package
+    needs: pack
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
 
     steps:
       - name: Download artifacts (CLI)
@@ -115,25 +124,21 @@ jobs:
           -Force
 
       - name: Create release
-        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          files: |
-            DiscordChatExporter.Cli.zip
-            DiscordChatExporter.zip
-          body: |
-            [Changelog](https://github.com/Tyrrrz/DiscordChatExporter/blob/master/Changelog.md)
+        run: >
+          gh release create ${{ github.ref_name }} DiscordChatExporter.Cli.zip DiscordChatExporter.zip
+          --title ${{ github.ref_name }}
+          --notes "[Changelog](${{ github.event.repository.html_url }}/blob/${{ github.ref_name }}/Changelog.md)"
+          --verify-tag
 
   notify:
     needs: deploy
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
-      - name: Get release version
-        id: get-version
-        uses: tyrrrz/action-get-tag@v1
-
       - name: Notify Discord
         uses: tyrrrz/action-http-request@v1
         with:
@@ -143,5 +148,5 @@ jobs:
             Content-Type: application/json; charset=UTF-8
           body: |
             {
-              "content": "**DiscordChatExporter** new version released!\nVersion: `${{ steps.get-version.outputs.tag }}`\nChangelog: <https://github.com/Tyrrrz/DiscordChatExporter/blob/${{ steps.get-version.outputs.tag }}/Changelog.md>"
+              "content": "**${{ github.event.repository.name }}** new version released!\nVersion: `${{ github.ref_name }}`\nChangelog: <${{ github.event.repository.html_url }}/blob/${{ github.ref_name }}/Changelog.md>"
             }
