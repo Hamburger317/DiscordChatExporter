@@ -21,7 +21,8 @@ internal partial class PlainTextMarkdownVisitor : MarkdownVisitor
 
     protected override ValueTask VisitTextAsync(
         TextNode text,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         _buffer.Append(text.Text);
         return default;
@@ -29,19 +30,18 @@ internal partial class PlainTextMarkdownVisitor : MarkdownVisitor
 
     protected override ValueTask VisitEmojiAsync(
         EmojiNode emoji,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
-        _buffer.Append(
-            emoji.IsCustomEmoji
-                ? $":{emoji.Name}:"
-                : emoji.Name
-        );
+        _buffer.Append(emoji.IsCustomEmoji ? $":{emoji.Name}:" : emoji.Name);
 
         return default;
     }
 
-    protected override async ValueTask VisitMentionAsync(MentionNode mention,
-        CancellationToken cancellationToken = default)
+    protected override async ValueTask VisitMentionAsync(
+        MentionNode mention,
+        CancellationToken cancellationToken = default
+    )
     {
         if (mention.Kind == MentionKind.Everyone)
         {
@@ -72,7 +72,7 @@ internal partial class PlainTextMarkdownVisitor : MarkdownVisitor
             _buffer.Append($"#{name}");
 
             // Voice channel marker
-            if (channel?.Kind.IsVoice() == true)
+            if (channel?.IsVoice == true)
                 _buffer.Append(" [voice]");
         }
         else if (mention.Kind == MentionKind.Role)
@@ -86,13 +86,12 @@ internal partial class PlainTextMarkdownVisitor : MarkdownVisitor
 
     protected override ValueTask VisitTimestampAsync(
         TimestampNode timestamp,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         _buffer.Append(
             timestamp.Instant is not null
-                ? !string.IsNullOrWhiteSpace(timestamp.Format)
-                    ? timestamp.Instant.Value.ToLocalString(timestamp.Format)
-                    : _context.FormatDate(timestamp.Instant.Value)
+                ? _context.FormatDate(timestamp.Instant.Value, timestamp.Format ?? "g")
                 : "Invalid date"
         );
 
@@ -105,7 +104,8 @@ internal partial class PlainTextMarkdownVisitor
     public static async ValueTask<string> FormatAsync(
         ExportContext context,
         string markdown,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         var nodes = MarkdownParser.ParseMinimal(markdown);
 

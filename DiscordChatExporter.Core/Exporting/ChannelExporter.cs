@@ -2,6 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using DiscordChatExporter.Core.Discord;
+using DiscordChatExporter.Core.Discord.Data;
 using DiscordChatExporter.Core.Exceptions;
 using Gress;
 
@@ -16,15 +17,35 @@ public class ChannelExporter
     public async ValueTask ExportChannelAsync(
         ExportRequest request,
         IProgress<Percentage>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
+        // Forum channels don't have messages, they are just a list of threads
+        if (request.Channel.Kind == ChannelKind.GuildForum)
+            throw new DiscordChatExporterException("Channel is a forum.");
+
         // Check if the channel is empty
-        if (request.Channel.LastMessageId is null)
-            throw DiscordChatExporterException.ChannelIsEmpty();
+        if (request.Channel.IsEmpty)
+            throw new DiscordChatExporterException("Channel does not contain any messages.");
 
         // Check if the 'after' boundary is valid
-        if (request.After is not null && request.Channel.LastMessageId < request.After)
-            throw DiscordChatExporterException.ChannelIsEmpty();
+        if (request.After is not null && !request.Channel.MayHaveMessagesAfter(request.After.Value))
+        {
+            throw new DiscordChatExporterException(
+                "Channel does not contain any messages within the specified period."
+            );
+        }
+
+        // Check if the 'before' boundary is valid
+        if (
+            request.Before is not null
+            && !request.Channel.MayHaveMessagesBefore(request.Before.Value)
+        )
+        {
+            throw new DiscordChatExporterException(
+                "Channel does not contain any messages within the specified period."
+            );
+        }
 
         // Build context
         var context = new ExportContext(_discord, request);
@@ -32,12 +53,15 @@ public class ChannelExporter
 
         // Export messages
         await using var messageExporter = new MessageExporter(context);
-        await foreach (var message in _discord.GetMessagesAsync(
-                           request.Channel.Id,
-                           request.After,
-                           request.Before,
-                           progress,
-                           cancellationToken))
+        await foreach (
+            var message in _discord.GetMessagesAsync(
+                request.Channel.Id,
+                request.After,
+                request.Before,
+                progress,
+                cancellationToken
+            )
+        )
         {
             // Resolve members for referenced users
             foreach (var user in message.GetReferencedUsers())
@@ -50,6 +74,10 @@ public class ChannelExporter
 
         // Throw if no messages were exported
         if (messageExporter.MessagesExported <= 0)
-            throw DiscordChatExporterException.ChannelIsEmpty();
+        {
+            throw new DiscordChatExporterException(
+                "Channel does not contain any matching messages within the specified period."
+            );
+        }
     }
 }

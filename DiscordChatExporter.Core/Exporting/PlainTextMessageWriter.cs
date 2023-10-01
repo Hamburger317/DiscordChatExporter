@@ -20,7 +20,8 @@ internal class PlainTextMessageWriter : MessageWriter
 
     private async ValueTask<string> FormatMarkdownAsync(
         string markdown,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken = default
+    ) =>
         Context.Request.ShouldFormatMarkdown
             ? await PlainTextMarkdownVisitor.FormatAsync(Context, markdown, cancellationToken)
             : markdown;
@@ -44,7 +45,8 @@ internal class PlainTextMessageWriter : MessageWriter
 
     private async ValueTask WriteAttachmentsAsync(
         IReadOnlyList<Attachment> attachments,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         if (!attachments.Any())
             return;
@@ -65,7 +67,8 @@ internal class PlainTextMessageWriter : MessageWriter
 
     private async ValueTask WriteEmbedsAsync(
         IReadOnlyList<Embed> embeds,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         foreach (var embed in embeds)
         {
@@ -148,7 +151,8 @@ internal class PlainTextMessageWriter : MessageWriter
 
     private async ValueTask WriteStickersAsync(
         IReadOnlyList<Sticker> stickers,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         if (!stickers.Any())
             return;
@@ -169,7 +173,8 @@ internal class PlainTextMessageWriter : MessageWriter
 
     private async ValueTask WriteReactionsAsync(
         IReadOnlyList<Reaction> reactions,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         if (!reactions.Any())
             return;
@@ -193,11 +198,13 @@ internal class PlainTextMessageWriter : MessageWriter
         await _writer.WriteLineAsync();
     }
 
-    public override async ValueTask WritePreambleAsync(CancellationToken cancellationToken = default)
+    public override async ValueTask WritePreambleAsync(
+        CancellationToken cancellationToken = default
+    )
     {
         await _writer.WriteLineAsync(new string('=', 62));
         await _writer.WriteLineAsync($"Guild: {Context.Request.Guild.Name}");
-        await _writer.WriteLineAsync($"Channel: {Context.Request.Channel.Category.Name} / {Context.Request.Channel.Name}");
+        await _writer.WriteLineAsync($"Channel: {Context.Request.Channel.GetHierarchicalName()}");
 
         if (!string.IsNullOrWhiteSpace(Context.Request.Channel.Topic))
         {
@@ -206,12 +213,16 @@ internal class PlainTextMessageWriter : MessageWriter
 
         if (Context.Request.After is not null)
         {
-            await _writer.WriteLineAsync($"After: {Context.FormatDate(Context.Request.After.Value.ToDate())}");
+            await _writer.WriteLineAsync(
+                $"After: {Context.FormatDate(Context.Request.After.Value.ToDate())}"
+            );
         }
 
         if (Context.Request.Before is not null)
         {
-            await _writer.WriteLineAsync($"Before: {Context.FormatDate(Context.Request.Before.Value.ToDate())}");
+            await _writer.WriteLineAsync(
+                $"Before: {Context.FormatDate(Context.Request.Before.Value.ToDate())}"
+            );
         }
 
         await _writer.WriteLineAsync(new string('=', 62));
@@ -220,7 +231,8 @@ internal class PlainTextMessageWriter : MessageWriter
 
     public override async ValueTask WriteMessageAsync(
         Message message,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default
+    )
     {
         await base.WriteMessageAsync(message, cancellationToken);
 
@@ -228,7 +240,7 @@ internal class PlainTextMessageWriter : MessageWriter
         await WriteMessageHeaderAsync(message);
 
         // Content
-        if (message.Kind.IsSystemNotification())
+        if (message.IsSystemNotification)
         {
             await _writer.WriteLineAsync(message.GetFallbackContent());
         }
@@ -250,7 +262,9 @@ internal class PlainTextMessageWriter : MessageWriter
         await _writer.WriteLineAsync();
     }
 
-    public override async ValueTask WritePostambleAsync(CancellationToken cancellationToken = default)
+    public override async ValueTask WritePostambleAsync(
+        CancellationToken cancellationToken = default
+    )
     {
         await _writer.WriteLineAsync(new string('=', 62));
         await _writer.WriteLineAsync($"Exported {MessagesWritten:N0} message(s)");
