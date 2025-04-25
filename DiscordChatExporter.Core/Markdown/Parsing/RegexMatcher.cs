@@ -3,20 +3,14 @@ using System.Text.RegularExpressions;
 
 namespace DiscordChatExporter.Core.Markdown.Parsing;
 
-internal class RegexMatcher<T> : IMatcher<T>
+internal class RegexMatcher<TContext, TValue>(
+    Regex regex,
+    Func<TContext, StringSegment, Match, TValue?> transform
+) : IMatcher<TContext, TValue>
 {
-    private readonly Regex _regex;
-    private readonly Func<StringSegment, Match, T?> _transform;
-
-    public RegexMatcher(Regex regex, Func<StringSegment, Match, T?> transform)
+    public ParsedMatch<TValue>? TryMatch(TContext context, StringSegment segment)
     {
-        _regex = regex;
-        _transform = transform;
-    }
-
-    public ParsedMatch<T>? TryMatch(StringSegment segment)
-    {
-        var match = _regex.Match(segment.Source, segment.StartIndex, segment.Length);
+        var match = regex.Match(segment.Source, segment.StartIndex, segment.Length);
         if (!match.Success)
             return null;
 
@@ -25,12 +19,12 @@ internal class RegexMatcher<T> : IMatcher<T>
         // Which is super weird because regex.Match(string, int) takes the whole input in context.
         // So in order to properly account for ^/$ regex tokens, we need to make sure that
         // the expression also matches on the bigger part of the input.
-        if (!_regex.IsMatch(segment.Source[..segment.EndIndex], segment.StartIndex))
+        if (!regex.IsMatch(segment.Source[..segment.EndIndex], segment.StartIndex))
             return null;
 
         var segmentMatch = segment.Relocate(match);
-        var value = _transform(segmentMatch, match);
+        var value = transform(context, segmentMatch, match);
 
-        return value is not null ? new ParsedMatch<T>(segmentMatch, value) : null;
+        return value is not null ? new ParsedMatch<TValue>(segmentMatch, value) : null;
     }
 }

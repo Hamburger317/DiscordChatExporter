@@ -9,20 +9,13 @@ using WebMarkupMin.Core;
 
 namespace DiscordChatExporter.Core.Exporting;
 
-internal class HtmlMessageWriter : MessageWriter
+internal class HtmlMessageWriter(Stream stream, ExportContext context, string themeName)
+    : MessageWriter(stream, context)
 {
-    private readonly TextWriter _writer;
-    private readonly string _themeName;
+    private readonly TextWriter _writer = new StreamWriter(stream);
 
     private readonly HtmlMinifier _minifier = new();
-    private readonly List<Message> _messageGroup = new();
-
-    public HtmlMessageWriter(Stream stream, ExportContext context, string themeName)
-        : base(stream, context)
-    {
-        _writer = new StreamWriter(stream);
-        _themeName = themeName;
-    }
+    private readonly List<Message> _messageGroup = [];
 
     private bool CanJoinGroup(Message message)
     {
@@ -80,11 +73,9 @@ internal class HtmlMessageWriter : MessageWriter
     {
         await _writer.WriteLineAsync(
             Minify(
-                await new PreambleTemplate
-                {
-                    Context = Context,
-                    ThemeName = _themeName
-                }.RenderAsync(cancellationToken)
+                await new PreambleTemplate { Context = Context, ThemeName = themeName }.RenderAsync(
+                    cancellationToken
+                )
             )
         );
     }
@@ -99,7 +90,7 @@ internal class HtmlMessageWriter : MessageWriter
                 await new MessageGroupTemplate
                 {
                     Context = Context,
-                    Messages = messages
+                    Messages = messages,
                 }.RenderAsync(cancellationToken)
             )
         );
@@ -140,7 +131,7 @@ internal class HtmlMessageWriter : MessageWriter
                 await new PostambleTemplate
                 {
                     Context = Context,
-                    MessagesWritten = MessagesWritten
+                    MessagesWritten = MessagesWritten,
                 }.RenderAsync(cancellationToken)
             )
         );

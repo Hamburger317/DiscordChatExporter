@@ -24,10 +24,10 @@ public class PartitioningSpecs
         await new ExportChannelsCommand
         {
             Token = Secrets.DiscordToken,
-            ChannelIds = new[] { ChannelIds.DateRangeTestCases },
+            ChannelIds = [ChannelIds.DateRangeTestCases],
             ExportFormat = ExportFormat.HtmlDark,
             OutputPath = filePath,
-            PartitionLimit = PartitionLimit.Parse("3")
+            PartitionLimit = PartitionLimit.Parse("3"),
         }.ExecuteAsync(new FakeConsole());
 
         // Assert
@@ -45,10 +45,10 @@ public class PartitioningSpecs
         await new ExportChannelsCommand
         {
             Token = Secrets.DiscordToken,
-            ChannelIds = new[] { ChannelIds.DateRangeTestCases },
+            ChannelIds = [ChannelIds.DateRangeTestCases],
             ExportFormat = ExportFormat.HtmlDark,
             OutputPath = filePath,
-            PartitionLimit = PartitionLimit.Parse("1kb")
+            PartitionLimit = PartitionLimit.Parse("1kb"),
         }.ExecuteAsync(new FakeConsole());
 
         // Assert

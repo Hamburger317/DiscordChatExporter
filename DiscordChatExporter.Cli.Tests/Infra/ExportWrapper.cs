@@ -19,12 +19,7 @@ namespace DiscordChatExporter.Cli.Tests.Infra;
 
 public static class ExportWrapper
 {
-    private static readonly AsyncKeyedLocker<string> Locker =
-        new(o =>
-        {
-            o.PoolSize = 20;
-            o.PoolInitialFill = 1;
-        });
+    private static readonly AsyncKeyedLocker<string> Locker = new();
 
     private static readonly string DirPath = Path.Combine(
         Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)
@@ -57,11 +52,11 @@ public static class ExportWrapper
             await new ExportChannelsCommand
             {
                 Token = Secrets.DiscordToken,
-                ChannelIds = new[] { channelId },
+                ChannelIds = [channelId],
                 ExportFormat = format,
                 OutputPath = filePath,
                 Locale = "en-US",
-                IsUtcNormalizationEnabled = true
+                IsUtcNormalizationEnabled = true,
             }.ExecuteAsync(console);
         }
 
@@ -93,19 +88,18 @@ public static class ExportWrapper
         Snowflake messageId
     )
     {
-        var message = (await GetMessagesAsHtmlAsync(channelId)).SingleOrDefault(
-            e =>
-                string.Equals(
-                    e.GetAttribute("data-message-id"),
-                    messageId.ToString(),
-                    StringComparison.OrdinalIgnoreCase
-                )
+        var message = (await GetMessagesAsHtmlAsync(channelId)).SingleOrDefault(e =>
+            string.Equals(
+                e.GetAttribute("data-message-id"),
+                messageId.ToString(),
+                StringComparison.OrdinalIgnoreCase
+            )
         );
 
         if (message is null)
         {
             throw new InvalidOperationException(
-                $"Message '{messageId}' does not exist in the export of channel '{channelId}'."
+                $"Message #{messageId} not found in the export of channel #{channelId}."
             );
         }
 
@@ -117,19 +111,18 @@ public static class ExportWrapper
         Snowflake messageId
     )
     {
-        var message = (await GetMessagesAsJsonAsync(channelId)).SingleOrDefault(
-            j =>
-                string.Equals(
-                    j.GetProperty("id").GetString(),
-                    messageId.ToString(),
-                    StringComparison.OrdinalIgnoreCase
-                )
+        var message = (await GetMessagesAsJsonAsync(channelId)).SingleOrDefault(j =>
+            string.Equals(
+                j.GetProperty("id").GetString(),
+                messageId.ToString(),
+                StringComparison.OrdinalIgnoreCase
+            )
         );
 
         if (message.ValueKind == JsonValueKind.Undefined)
         {
             throw new InvalidOperationException(
-                $"Message '{messageId}' does not exist in the export of channel '{channelId}'."
+                $"Message #{messageId} not found in the export of channel #{channelId}."
             );
         }
 

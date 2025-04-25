@@ -7,7 +7,12 @@ using JsonExtensions.Reading;
 namespace DiscordChatExporter.Core.Discord.Data;
 
 // https://discord.com/developers/docs/resources/sticker#sticker-resource
-public record Sticker(Snowflake Id, string Name, StickerFormat Format, string SourceUrl)
+public partial record Sticker(Snowflake Id, string Name, StickerFormat Format, string SourceUrl)
+{
+    public bool IsImage { get; } = Format != StickerFormat.Lottie;
+}
+
+public partial record Sticker
 {
     public static Sticker Parse(JsonElement json)
     {
@@ -22,7 +27,8 @@ public record Sticker(Snowflake Id, string Name, StickerFormat Format, string So
                 StickerFormat.Png => "png",
                 StickerFormat.Apng => "png",
                 StickerFormat.Lottie => "json",
-                _ => throw new InvalidOperationException($"Unknown sticker format '{format}'.")
+                StickerFormat.Gif => "gif",
+                _ => throw new InvalidOperationException($"Unknown sticker format '{format}'."),
             }
         );
 

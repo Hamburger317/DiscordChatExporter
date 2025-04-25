@@ -30,13 +30,19 @@ public partial record Message(
     Interaction? Interaction
 ) : IHasId
 {
-    public bool IsSystemNotification =>
+    public bool IsSystemNotification { get; } =
         Kind is >= MessageKind.RecipientAdd and <= MessageKind.ThreadCreated;
 
-    public bool IsReply => Kind == MessageKind.Reply;
+    public bool IsReply { get; } = Kind == MessageKind.Reply;
 
     // App interactions are rendered as replies in the Discord client, but they are not actually replies
     public bool IsReplyLike => IsReply || Interaction is not null;
+
+    public bool IsEmpty { get; } =
+        string.IsNullOrWhiteSpace(Content)
+        && !Attachments.Any()
+        && !Embeds.Any()
+        && !Stickers.Any();
 
     public IEnumerable<User> GetReferencedUsers()
     {
@@ -77,24 +83,23 @@ public partial record Message
                 // Find embeds with the same URL that only contain a single image and nothing else
                 var trailingEmbeds = embeds
                     .Skip(i + 1)
-                    .TakeWhile(
-                        e =>
-                            e.Url == embed.Url
-                            && e.Timestamp is null
-                            && e.Author is null
-                            && e.Color is null
-                            && string.IsNullOrWhiteSpace(e.Description)
-                            && !e.Fields.Any()
-                            && e.Images.Count == 1
-                            && e.Footer is null
+                    .TakeWhile(e =>
+                        e.Url == embed.Url
+                        && e.Timestamp is null
+                        && e.Author is null
+                        && e.Color is null
+                        && string.IsNullOrWhiteSpace(e.Description)
+                        && !e.Fields.Any()
+                        && e.Images.Count == 1
+                        && e.Footer is null
                     )
                     .ToArray();
 
                 if (trailingEmbeds.Any())
                 {
                     // Concatenate all images into one embed
-                    var images = embed.Images
-                        .Concat(trailingEmbeds.SelectMany(e => e.Images))
+                    var images = embed
+                        .Images.Concat(trailingEmbeds.SelectMany(e => e.Images))
                         .ToArray();
 
                     normalizedEmbeds.Add(embed with { Images = images });
@@ -138,28 +143,28 @@ public partial record Message
             json.GetPropertyOrNull("attachments")
                 ?.EnumerateArrayOrNull()
                 ?.Select(Attachment.Parse)
-                .ToArray() ?? Array.Empty<Attachment>();
+                .ToArray() ?? [];
 
         var embeds = NormalizeEmbeds(
             json.GetPropertyOrNull("embeds")?.EnumerateArrayOrNull()?.Select(Embed.Parse).ToArray()
-                ?? Array.Empty<Embed>()
+                ?? []
         );
 
         var stickers =
             json.GetPropertyOrNull("sticker_items")
                 ?.EnumerateArrayOrNull()
                 ?.Select(Sticker.Parse)
-                .ToArray() ?? Array.Empty<Sticker>();
+                .ToArray() ?? [];
 
         var reactions =
             json.GetPropertyOrNull("reactions")
                 ?.EnumerateArrayOrNull()
                 ?.Select(Reaction.Parse)
-                .ToArray() ?? Array.Empty<Reaction>();
+                .ToArray() ?? [];
 
         var mentionedUsers =
             json.GetPropertyOrNull("mentions")?.EnumerateArrayOrNull()?.Select(User.Parse).ToArray()
-            ?? Array.Empty<User>();
+            ?? [];
 
         var messageReference = json.GetPropertyOrNull("message_reference")
             ?.Pipe(MessageReference.Parse);

@@ -8,12 +8,8 @@ using Gress;
 
 namespace DiscordChatExporter.Core.Exporting;
 
-public class ChannelExporter
+public class ChannelExporter(DiscordClient discord)
 {
-    private readonly DiscordClient _discord;
-
-    public ChannelExporter(DiscordClient discord) => _discord = discord;
-
     public async ValueTask ExportChannelAsync(
         ExportRequest request,
         IProgress<Percentage>? progress = null,
@@ -22,39 +18,54 @@ public class ChannelExporter
     {
         // Forum channels don't have messages, they are just a list of threads
         if (request.Channel.Kind == ChannelKind.GuildForum)
-            throw new DiscordChatExporterException("Channel is a forum.");
-
-        // Check if the channel is empty
-        if (request.Channel.IsEmpty)
-            throw new DiscordChatExporterException("Channel does not contain any messages.");
-
-        // Check if the 'after' boundary is valid
-        if (request.After is not null && !request.Channel.MayHaveMessagesAfter(request.After.Value))
         {
             throw new DiscordChatExporterException(
-                "Channel does not contain any messages within the specified period."
-            );
-        }
-
-        // Check if the 'before' boundary is valid
-        if (
-            request.Before is not null
-            && !request.Channel.MayHaveMessagesBefore(request.Before.Value)
-        )
-        {
-            throw new DiscordChatExporterException(
-                "Channel does not contain any messages within the specified period."
+                $"Channel '{request.Channel.Name}' "
+                    + $"of guild '{request.Guild.Name}' "
+                    + $"is a forum and cannot be exported directly. "
+                    + "You need to pull its threads and export them individually."
             );
         }
 
         // Build context
-        var context = new ExportContext(_discord, request);
+        var context = new ExportContext(discord, request);
         await context.PopulateChannelsAndRolesAsync(cancellationToken);
 
-        // Export messages
+        // Initialize the exporter before further checks to ensure the file is created even if
+        // an exception is thrown after this point.
         await using var messageExporter = new MessageExporter(context);
+
+        // Check if the channel is empty
+        if (request.Channel.IsEmpty)
+        {
+            throw new ChannelEmptyException(
+                $"Channel '{request.Channel.Name}' "
+                    + $"of guild '{request.Guild.Name}' "
+                    + $"does not contain any messages; an empty file will be created."
+            );
+        }
+
+        // Check if the 'before' and 'after' boundaries are valid
+        if (
+            (
+                request.Before is not null
+                && !request.Channel.MayHaveMessagesBefore(request.Before.Value)
+            )
+            || (
+                request.After is not null
+                && !request.Channel.MayHaveMessagesAfter(request.After.Value)
+            )
+        )
+        {
+            throw new ChannelEmptyException(
+                $"Channel '{request.Channel.Name}' "
+                    + $"of guild '{request.Guild.Name}' "
+                    + $"does not contain any messages within the specified period; an empty file will be created."
+            );
+        }
+
         await foreach (
-            var message in _discord.GetMessagesAsync(
+            var message in discord.GetMessagesAsync(
                 request.Channel.Id,
                 request.After,
                 request.Before,
@@ -63,21 +74,27 @@ public class ChannelExporter
             )
         )
         {
-            // Resolve members for referenced users
-            foreach (var user in message.GetReferencedUsers())
-                await context.PopulateMemberAsync(user, cancellationToken);
+            try
+            {
+                // Resolve members for referenced users
+                foreach (var user in message.GetReferencedUsers())
+                    await context.PopulateMemberAsync(user, cancellationToken);
 
-            // Export the message
-            if (request.MessageFilter.IsMatch(message))
-                await messageExporter.ExportMessageAsync(message, cancellationToken);
-        }
-
-        // Throw if no messages were exported
-        if (messageExporter.MessagesExported <= 0)
-        {
-            throw new DiscordChatExporterException(
-                "Channel does not contain any matching messages within the specified period."
-            );
+                // Export the message
+                if (request.MessageFilter.IsMatch(message))
+                    await messageExporter.ExportMessageAsync(message, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                // Provide more context to the exception, to simplify debugging based on error messages
+                throw new DiscordChatExporterException(
+                    $"Failed to export message #{message.Id} "
+                        + $"in channel '{request.Channel.Name}' (#{request.Channel.Id}) "
+                        + $"of guild '{request.Guild.Name} (#{request.Guild.Id})'.",
+                    ex is not DiscordChatExporterException dex || dex.IsFatal,
+                    ex
+                );
+            }
         }
     }
 }

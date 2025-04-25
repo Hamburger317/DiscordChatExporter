@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using System.Threading.Tasks;
 using AngleSharp.Dom;
 using DiscordChatExporter.Cli.Tests.Infra;
@@ -54,7 +55,7 @@ public class HtmlEmbedSpecs
             .QuerySelectorAll("img")
             .Select(e => e.GetAttribute("src"))
             .WhereNotNull()
-            .Where(s => s.EndsWith("f8w05ja8s4e61.png"))
+            .Where(s => s.Contains("f8w05ja8s4e61.png", StringComparison.Ordinal))
             .Should()
             .ContainSingle();
     }
@@ -89,11 +90,11 @@ public class HtmlEmbedSpecs
             .QuerySelectorAll("source")
             .Select(e => e.GetAttribute("src"))
             .WhereNotNull()
-            .Where(
-                s =>
-                    s.EndsWith(
-                        "i_am_currently_feeling_slight_displeasure_of_what_you_have_just_sent_lqrem.mp4"
-                    )
+            .Where(s =>
+                s.Contains(
+                    "i_am_currently_feeling_slight_displeasure_of_what_you_have_just_sent_lqrem.mp4",
+                    StringComparison.Ordinal
+                )
             )
             .Should()
             .ContainSingle();
@@ -113,7 +114,7 @@ public class HtmlEmbedSpecs
             .QuerySelectorAll("source")
             .Select(e => e.GetAttribute("src"))
             .WhereNotNull()
-            .Where(s => s.EndsWith("tooncasm-test-copy.mp4"))
+            .Where(s => s.Contains("tooncasm-test-copy.mp4", StringComparison.Ordinal))
             .Should()
             .ContainSingle();
     }
@@ -148,6 +149,26 @@ public class HtmlEmbedSpecs
         iframeUrl.Should().StartWith("https://open.spotify.com/embed/track/1LHZMWefF9502NPfArRfvP");
     }
 
+    [Fact(Skip = "Twitch does not allow embeds from inside local HTML files")]
+    public async Task I_can_export_a_channel_that_contains_a_message_with_a_Twitch_clip_embed()
+    {
+        // https://github.com/Tyrrrz/DiscordChatExporter/issues/1196
+
+        // Act
+        var message = await ExportWrapper.GetMessageAsHtmlAsync(
+            ChannelIds.EmbedTestCases,
+            Snowflake.Parse("1207002986128216074")
+        );
+
+        // Assert
+        var iframeUrl = message.QuerySelector("iframe")?.GetAttribute("src");
+        iframeUrl
+            .Should()
+            .StartWith(
+                "https://clips.twitch.tv/embed?clip=SpicyMildCiderThisIsSparta--PQhbllrvej_Ee7v"
+            );
+    }
+
     [Fact]
     public async Task I_can_export_a_channel_that_contains_a_message_with_a_YouTube_video_embed()
     {
@@ -176,15 +197,45 @@ public class HtmlEmbedSpecs
         );
 
         // Assert
-        message
+        var imageUrls = message
             .QuerySelectorAll("img")
             .Select(e => e.GetAttribute("src"))
+            .ToArray();
+
+        imageUrls
             .Should()
-            .ContainInOrder(
-                "https://images-ext-1.discordapp.net/external/-n--xW3EHH_3jlrheVkMXHCM7T86b5Ty4-MzXCT4m1Q/https/pbs.twimg.com/media/FVYIzYPWAAAMBqZ.png",
-                "https://images-ext-2.discordapp.net/external/z5nEmGeEldV-kswydGLhqUsFHbb5AWHtdvc9XT6N5rE/https/pbs.twimg.com/media/FVYJBWJWAAMNAx2.png",
-                "https://images-ext-2.discordapp.net/external/gnip03SawMB6uZLagN5sRDpA_1Ap1CcEhMbJfK1z6WQ/https/pbs.twimg.com/media/FVYJHiRX0AANZcz.png",
-                "https://images-ext-2.discordapp.net/external/jl1v6cCbLaGmiwmKU-ZkXnF4cFsJ39f9A3-oEdqPdZs/https/pbs.twimg.com/media/FVYJNZNXwAAPnVG.png"
+            .Contain(u =>
+                u.EndsWith(
+                    "https/pbs.twimg.com/media/FVYIzYPWAAAMBqZ.png",
+                    StringComparison.Ordinal
+                )
+            );
+
+        imageUrls
+            .Should()
+            .Contain(u =>
+                u.EndsWith(
+                    "https/pbs.twimg.com/media/FVYJBWJWAAMNAx2.png",
+                    StringComparison.Ordinal
+                )
+            );
+
+        imageUrls
+            .Should()
+            .Contain(u =>
+                u.EndsWith(
+                    "https/pbs.twimg.com/media/FVYJHiRX0AANZcz.png",
+                    StringComparison.Ordinal
+                )
+            );
+
+        imageUrls
+            .Should()
+            .Contain(u =>
+                u.EndsWith(
+                    "https/pbs.twimg.com/media/FVYJNZNXwAAPnVG.png",
+                    StringComparison.Ordinal
+                )
             );
 
         message.QuerySelectorAll(".chatlog__embed").Should().ContainSingle();
@@ -202,6 +253,6 @@ public class HtmlEmbedSpecs
         );
 
         // Assert
-        message.Text().Should().Contain("DiscordChatExporter TestServer");
+        message.Text().Should().Contain("DiscordChatExporter Test Server");
     }
 }

@@ -1,47 +1,64 @@
 name: docker
 
-on: [push, pull_request]
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    tags:
+      - "*"
+  pull_request:
+    branches:
+      - master
 
 jobs:
-  build:
+  # Outputs from this job aren't really used, but it's here to verify that the Dockerfile builds correctly
+  pack:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     permissions:
       actions: write
       contents: read
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
       - name: Build image
         run: >
-          docker buildx build
+          docker buildx build .
           --file DiscordChatExporter.Cli.dockerfile
           --platform linux/amd64,linux/arm64
+          --build-arg VERSION=${{ github.ref_type == 'tag' && github.ref_name || format('999.9.9-ci-{0}', github.sha) }}
           --output type=tar,dest=DiscordChatExporter.Cli.Docker.tar
-          .
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: DiscordChatExporter.Cli.Docker
           path: DiscordChatExporter.Cli.Docker.tar
+          if-no-files-found: error
 
-  deploy-latest:
-    if: ${{ github.event_name == 'push' && github.ref_type == 'branch' && github.ref_name == 'master' }}
+  deploy:
+    # Deploy to DockerHub only on tag push or master branch push
+    if: ${{ github.ref_type == 'tag' || github.ref_type == 'branch' && github.ref_name == 'master' }}
+
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     permissions:
       contents: read
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
       - name: Login to DockerHub
         run: >
@@ -50,37 +67,11 @@ jobs:
 
       - name: Build & push image
         run: >
-          docker buildx build
+          docker buildx build .
           --file DiscordChatExporter.Cli.dockerfile
           --platform linux/amd64,linux/arm64
+          --build-arg VERSION=${{ github.ref_type == 'tag' && github.ref_name || format('999.9.9-ci-{0}', github.sha) }}
           --push
           --tag tyrrrz/discordchatexporter:latest
-          .
-
-  deploy-stable:
-    if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Install Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Login to DockerHub
-        run: >
-          echo ${{ secrets.DOCKER_TOKEN }} |
-          docker login --username tyrrrz --password-stdin
-
-      - name: Build & push image
-        run: >
-          docker buildx build
-          --file DiscordChatExporter.Cli.dockerfile
-          --platform linux/amd64,linux/arm64
-          --push
-          --tag tyrrrz/discordchatexporter:stable
-          --tag tyrrrz/discordchatexporter:${{ github.ref_name }}
-          .
+          ${{ github.ref_type == 'tag' && '--tag tyrrrz/discordchatexporter:$GITHUB_REF_NAME' || '' }}
+          ${{ github.ref_type == 'tag' && '--tag tyrrrz/discordchatexporter:stable' || '' }}

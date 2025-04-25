@@ -1,30 +1,21 @@
 ﻿using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using DiscordChatExporter.Core.Discord.Data;
 using DiscordChatExporter.Core.Markdown;
 using DiscordChatExporter.Core.Markdown.Parsing;
 using DiscordChatExporter.Core.Utils.Extensions;
 
 namespace DiscordChatExporter.Core.Exporting;
 
-internal partial class PlainTextMarkdownVisitor : MarkdownVisitor
+internal partial class PlainTextMarkdownVisitor(ExportContext context, StringBuilder buffer)
+    : MarkdownVisitor
 {
-    private readonly ExportContext _context;
-    private readonly StringBuilder _buffer;
-
-    public PlainTextMarkdownVisitor(ExportContext context, StringBuilder buffer)
-    {
-        _context = context;
-        _buffer = buffer;
-    }
-
     protected override ValueTask VisitTextAsync(
         TextNode text,
         CancellationToken cancellationToken = default
     )
     {
-        _buffer.Append(text.Text);
+        buffer.Append(text.Text);
         return default;
     }
 
@@ -33,7 +24,7 @@ internal partial class PlainTextMarkdownVisitor : MarkdownVisitor
         CancellationToken cancellationToken = default
     )
     {
-        _buffer.Append(emoji.IsCustomEmoji ? $":{emoji.Name}:" : emoji.Name);
+        buffer.Append(emoji.IsCustomEmoji ? $":{emoji.Name}:" : emoji.Name);
 
         return default;
     }
@@ -45,11 +36,11 @@ internal partial class PlainTextMarkdownVisitor : MarkdownVisitor
     {
         if (mention.Kind == MentionKind.Everyone)
         {
-            _buffer.Append("@everyone");
+            buffer.Append("@everyone");
         }
         else if (mention.Kind == MentionKind.Here)
         {
-            _buffer.Append("@here");
+            buffer.Append("@here");
         }
         else if (mention.Kind == MentionKind.User)
         {
@@ -57,30 +48,30 @@ internal partial class PlainTextMarkdownVisitor : MarkdownVisitor
             // which means they need to be populated on demand.
             // https://github.com/Tyrrrz/DiscordChatExporter/issues/304
             if (mention.TargetId is not null)
-                await _context.PopulateMemberAsync(mention.TargetId.Value, cancellationToken);
+                await context.PopulateMemberAsync(mention.TargetId.Value, cancellationToken);
 
-            var member = mention.TargetId?.Pipe(_context.TryGetMember);
+            var member = mention.TargetId?.Pipe(context.TryGetMember);
             var displayName = member?.DisplayName ?? member?.User.DisplayName ?? "Unknown";
 
-            _buffer.Append($"@{displayName}");
+            buffer.Append($"@{displayName}");
         }
         else if (mention.Kind == MentionKind.Channel)
         {
-            var channel = mention.TargetId?.Pipe(_context.TryGetChannel);
+            var channel = mention.TargetId?.Pipe(context.TryGetChannel);
             var name = channel?.Name ?? "deleted-channel";
 
-            _buffer.Append($"#{name}");
+            buffer.Append($"#{name}");
 
             // Voice channel marker
             if (channel?.IsVoice == true)
-                _buffer.Append(" [voice]");
+                buffer.Append(" [voice]");
         }
         else if (mention.Kind == MentionKind.Role)
         {
-            var role = mention.TargetId?.Pipe(_context.TryGetRole);
+            var role = mention.TargetId?.Pipe(context.TryGetRole);
             var name = role?.Name ?? "deleted-role";
 
-            _buffer.Append($"@{name}");
+            buffer.Append($"@{name}");
         }
     }
 
@@ -89,9 +80,9 @@ internal partial class PlainTextMarkdownVisitor : MarkdownVisitor
         CancellationToken cancellationToken = default
     )
     {
-        _buffer.Append(
+        buffer.Append(
             timestamp.Instant is not null
-                ? _context.FormatDate(timestamp.Instant.Value, timestamp.Format ?? "g")
+                ? context.FormatDate(timestamp.Instant.Value, timestamp.Format ?? "g")
                 : "Invalid date"
         );
 

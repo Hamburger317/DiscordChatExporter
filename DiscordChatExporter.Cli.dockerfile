@@ -1,18 +1,16 @@
 # -- Build
 # Specify the platform here so that we pull the SDK image matching the host platform,
 # instead of the target platform specified during build by the `--platform` option.
-# Use the .NET 8.0 preview because the `--arch` option is only available in that version.
-# https://github.com/dotnet/dotnet-docker/issues/4388#issuecomment-1459038566
-# TODO: switch images to Alpine once .NET 8.0 is released.
-# Currently, the correct preview version is only available on Debian.
-# https://github.com/dotnet/dotnet-docker/blob/main/samples/selecting-tags.md
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0-preview AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
 
 # Expose the target architecture set by the `docker build --platform` option, so that
 # we can build the assembly for the correct platform.
 ARG TARGETARCH
 
-WORKDIR /build
+# Allow setting the assembly version from the build command
+ARG VERSION=0.0.0
+
+WORKDIR /tmp/app
 
 COPY favicon.ico .
 COPY NuGet.config .
@@ -22,25 +20,44 @@ COPY DiscordChatExporter.Cli DiscordChatExporter.Cli
 
 # Publish a self-contained assembly so we can use a slimmer runtime image
 RUN dotnet publish DiscordChatExporter.Cli \
-    --configuration Release \
+    -p:Version=$VERSION \
     -p:CSharpier_Bypass=true \
+    --configuration Release \
     --self-contained \
     --use-current-runtime \
     --arch $TARGETARCH \
-    --output publish/
+    --output DiscordChatExporter.Cli/bin/publish/
 
 # -- Run
 # Use `runtime-deps` instead of `runtime` because we have a self-contained assembly
-FROM --platform=$TARGETPLATFORM mcr.microsoft.com/dotnet/runtime-deps:7.0 AS run
+FROM --platform=$TARGETPLATFORM mcr.microsoft.com/dotnet/runtime-deps:9.0-alpine AS run
 
-# Create a non-root user to run the app, so that the output files can be accessed by the host
+LABEL org.opencontainers.image.title="DiscordChatExporter.Cli"
+LABEL org.opencontainers.image.description="DiscordChatExporter is an application that can be used to export message history from any Discord channel to a file."
+LABEL org.opencontainers.image.authors="tyrrrz.me"
+LABEL org.opencontainers.image.source="https://github.com/Tyrrrz/DiscordChatExporter"
+LABEL org.opencontainers.image.licenses="MIT"
+
+# Alpine image doesn't come with the ICU libraries pre-installed, so we need to install them manually.
+# We need the full ICU data because we allow the user to specify any locale for formatting purposes.
+RUN apk add --no-cache icu-libs icu-data-full
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
+ENV LC_ALL=en_US.UTF-8
+ENV LANG=en_US.UTF-8
+
+# Alpine is missing tzdata, which we need to support timezones
+RUN apk add --no-cache tzdata
+
+# Use a non-root user to ensure that the files shared with the host are accessible by the host user
 # https://github.com/Tyrrrz/DiscordChatExporter/issues/851
-RUN adduser --disabled-password --no-create-home dce
-USER dce
+# https://github.com/Tyrrrz/DiscordChatExporter/issues/1174
+RUN apk add --no-cache su-exec
+RUN addgroup -S -g 1000 dce && adduser -S -H -G dce -u 1000 dce
 
 # This directory is exposed to the user for mounting purposes, so it's important that it always
 # stays the same for backwards compatibility.
 WORKDIR /out
 
-COPY --from=build /build/publish /opt/dce
-ENTRYPOINT ["/opt/dce/DiscordChatExporter.Cli"]
+COPY --from=build /tmp/app/DiscordChatExporter.Cli/bin/publish /opt/app
+COPY docker-entrypoint.sh /opt/app
+ENTRYPOINT ["/opt/app/docker-entrypoint.sh"]

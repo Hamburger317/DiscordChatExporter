@@ -448,7 +448,10 @@
                             </div>
                         }
                         // Generic video embed
-                        else if (embed.Kind == EmbedKind.Video && !string.IsNullOrWhiteSpace(embed.Url))
+                        else if (embed.Kind == EmbedKind.Video 
+                                 && !string.IsNullOrWhiteSpace(embed.Url)
+                                 // Twitch clips cannot be embedded in local HTML files
+                                 && embed.TryGetTwitchClip() is null)
                         {
                             var embedVideoUrl =
                                 embed.Video?.ProxyUrl ?? embed.Video?.Url ??
@@ -634,7 +637,7 @@
                     @foreach (var sticker in message.Stickers)
                     {
                         <div class="chatlog__sticker" title="@sticker.Name">
-                            @if (sticker.Format is StickerFormat.Png or StickerFormat.Apng)
+                            @if (sticker.IsImage)
                             {
                                 <img class="chatlog__sticker--media" src="@await ResolveAssetUrlAsync(sticker.SourceUrl)" alt="Sticker">
                             }

@@ -1,51 +1,68 @@
 ﻿using System;
-using System.Globalization;
 using System.IO;
+using System.Text.Json.Serialization;
 using Cogwheel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using DiscordChatExporter.Core.Exporting;
+using DiscordChatExporter.Gui.Framework;
 using DiscordChatExporter.Gui.Models;
-using Microsoft.Win32;
 
 namespace DiscordChatExporter.Gui.Services;
 
-public partial class SettingsService : SettingsBase
+[ObservableObject]
+public partial class SettingsService()
+    : SettingsBase(
+        Path.Combine(AppContext.BaseDirectory, "Settings.dat"),
+        SerializerContext.Default
+    )
 {
-    public bool IsUkraineSupportMessageEnabled { get; set; } = true;
+    [ObservableProperty]
+    public partial bool IsUkraineSupportMessageEnabled { get; set; } = true;
 
-    public bool IsAutoUpdateEnabled { get; set; } = true;
+    [ObservableProperty]
+    public partial ThemeVariant Theme { get; set; }
 
-    public bool IsDarkModeEnabled { get; set; } = IsDarkModeEnabledByDefault();
+    [ObservableProperty]
+    public partial bool IsAutoUpdateEnabled { get; set; } = true;
 
-    public bool IsTokenPersisted { get; set; } = true;
+    [ObservableProperty]
+    public partial bool IsTokenPersisted { get; set; } = true;
 
-    public ThreadInclusionMode ThreadInclusionMode { get; set; } = ThreadInclusionMode.None;
+    [ObservableProperty]
+    public partial ThreadInclusionMode ThreadInclusionMode { get; set; }
 
-    public string Locale { get; set; } = CultureInfo.CurrentCulture.Name;
+    [ObservableProperty]
+    public partial string? Locale { get; set; }
 
-    public bool IsUtcNormalizationEnabled { get; set; }
+    [ObservableProperty]
+    public partial bool IsUtcNormalizationEnabled { get; set; }
 
-    public int ParallelLimit { get; set; } = 1;
+    [ObservableProperty]
+    public partial int ParallelLimit { get; set; } = 1;
 
-    public Version? LastAppVersion { get; set; }
+    [ObservableProperty]
+    public partial string? LastToken { get; set; }
 
-    public string? LastToken { get; set; }
+    [ObservableProperty]
+    public partial ExportFormat LastExportFormat { get; set; } = ExportFormat.HtmlDark;
 
-    public ExportFormat LastExportFormat { get; set; } = ExportFormat.HtmlDark;
+    [ObservableProperty]
+    public partial string? LastPartitionLimitValue { get; set; }
 
-    public string? LastPartitionLimitValue { get; set; }
+    [ObservableProperty]
+    public partial string? LastMessageFilterValue { get; set; }
 
-    public string? LastMessageFilterValue { get; set; }
+    [ObservableProperty]
+    public partial bool LastShouldFormatMarkdown { get; set; } = true;
 
-    public bool LastShouldFormatMarkdown { get; set; } = true;
+    [ObservableProperty]
+    public partial bool LastShouldDownloadAssets { get; set; }
 
-    public bool LastShouldDownloadAssets { get; set; }
+    [ObservableProperty]
+    public partial bool LastShouldReuseAssets { get; set; }
 
-    public bool LastShouldReuseAssets { get; set; }
-
-    public string? LastAssetsDirPath { get; set; }
-
-    public SettingsService()
-        : base(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Settings.dat")) { }
+    [ObservableProperty]
+    public partial string? LastAssetsDirPath { get; set; }
 
     public override void Save()
     {
@@ -62,21 +79,6 @@ public partial class SettingsService : SettingsBase
 
 public partial class SettingsService
 {
-    private static bool IsDarkModeEnabledByDefault()
-    {
-        try
-        {
-            return Registry.CurrentUser
-                .OpenSubKey(
-                    "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
-                    false
-                )
-                ?.GetValue("AppsUseLightTheme")
-                is 0;
-        }
-        catch
-        {
-            return false;
-        }
-    }
+    [JsonSerializable(typeof(SettingsService))]
+    private partial class SerializerContext : JsonSerializerContext;
 }

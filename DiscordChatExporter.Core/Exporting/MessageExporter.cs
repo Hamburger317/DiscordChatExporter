@@ -6,21 +6,44 @@ using DiscordChatExporter.Core.Discord.Data;
 
 namespace DiscordChatExporter.Core.Exporting;
 
-internal partial class MessageExporter : IAsyncDisposable
+internal partial class MessageExporter(ExportContext context) : IAsyncDisposable
 {
-    private readonly ExportContext _context;
-
     private int _partitionIndex;
     private MessageWriter? _writer;
 
     public long MessagesExported { get; private set; }
 
-    public MessageExporter(ExportContext context)
+    private async ValueTask<MessageWriter> InitializeWriterAsync(
+        CancellationToken cancellationToken = default
+    )
     {
-        _context = context;
+        // Ensure that the partition limit has not been reached
+        if (
+            _writer is not null
+            && context.Request.PartitionLimit.IsReached(
+                _writer.MessagesWritten,
+                _writer.BytesWritten
+            )
+        )
+        {
+            await UninitializeWriterAsync(cancellationToken);
+            _partitionIndex++;
+        }
+
+        // Writer is still valid, return
+        if (_writer is not null)
+            return _writer;
+
+        Directory.CreateDirectory(context.Request.OutputDirPath);
+        var filePath = GetPartitionFilePath(context.Request.OutputFilePath, _partitionIndex);
+
+        var writer = CreateMessageWriter(filePath, context.Request.Format, context);
+        await writer.WritePreambleAsync(cancellationToken);
+
+        return _writer = writer;
     }
 
-    private async ValueTask ResetWriterAsync(CancellationToken cancellationToken = default)
+    private async ValueTask UninitializeWriterAsync(CancellationToken cancellationToken = default)
     {
         if (_writer is not null)
         {
@@ -37,47 +60,24 @@ internal partial class MessageExporter : IAsyncDisposable
         }
     }
 
-    private async ValueTask<MessageWriter> GetWriterAsync(
-        CancellationToken cancellationToken = default
-    )
-    {
-        // Ensure that the partition limit has not been reached
-        if (
-            _writer is not null
-            && _context.Request.PartitionLimit.IsReached(
-                _writer.MessagesWritten,
-                _writer.BytesWritten
-            )
-        )
-        {
-            await ResetWriterAsync(cancellationToken);
-            _partitionIndex++;
-        }
-
-        // Writer is still valid, return
-        if (_writer is not null)
-            return _writer;
-
-        Directory.CreateDirectory(_context.Request.OutputDirPath);
-        var filePath = GetPartitionFilePath(_context.Request.OutputFilePath, _partitionIndex);
-
-        var writer = CreateMessageWriter(filePath, _context.Request.Format, _context);
-        await writer.WritePreambleAsync(cancellationToken);
-
-        return _writer = writer;
-    }
-
     public async ValueTask ExportMessageAsync(
         Message message,
         CancellationToken cancellationToken = default
     )
     {
-        var writer = await GetWriterAsync(cancellationToken);
+        var writer = await InitializeWriterAsync(cancellationToken);
         await writer.WriteMessageAsync(message, cancellationToken);
         MessagesExported++;
     }
 
-    public async ValueTask DisposeAsync() => await ResetWriterAsync();
+    public async ValueTask DisposeAsync()
+    {
+        // If not messages were written, force the creation of an empty file
+        if (MessagesExported <= 0)
+            _ = await InitializeWriterAsync();
+
+        await UninitializeWriterAsync();
+    }
 }
 
 internal partial class MessageExporter
@@ -107,13 +107,15 @@ internal partial class MessageExporter
             ExportFormat.PlainText => new PlainTextMessageWriter(File.Create(filePath), context),
             ExportFormat.Csv => new CsvMessageWriter(File.Create(filePath), context),
             ExportFormat.HtmlDark => new HtmlMessageWriter(File.Create(filePath), context, "Dark"),
-            ExportFormat.HtmlLight
-                => new HtmlMessageWriter(File.Create(filePath), context, "Light"),
+            ExportFormat.HtmlLight => new HtmlMessageWriter(
+                File.Create(filePath),
+                context,
+                "Light"
+            ),
             ExportFormat.Json => new JsonMessageWriter(File.Create(filePath), context),
-            _
-                => throw new ArgumentOutOfRangeException(
-                    nameof(format),
-                    $"Unknown export format '{format}'."
-                )
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(format),
+                $"Unknown export format '{format}'."
+            ),
         };
 }

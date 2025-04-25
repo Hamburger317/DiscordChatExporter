@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -16,7 +15,6 @@ using DiscordChatExporter.Core.Exceptions;
 using DiscordChatExporter.Core.Exporting;
 using DiscordChatExporter.Core.Exporting.Filtering;
 using DiscordChatExporter.Core.Exporting.Partitioning;
-using DiscordChatExporter.Core.Utils;
 using DiscordChatExporter.Core.Utils.Extensions;
 using Gress;
 using Spectre.Console;
@@ -31,8 +29,8 @@ public abstract class ExportCommandBase : DiscordCommandBase
         "output",
         'o',
         Description = "Output file or directory path. "
-            + "Directory path must end with a slash to avoid ambiguity. "
-            + "If a directory is specified, file names will be generated automatically. "
+            + "If a directory is specified, file names will be generated automatically based on the channel names and export parameters. "
+            + "Directory paths must end with a slash to avoid ambiguity. "
             + "Supports template tokens, see the documentation for more info."
     )]
     public string OutputPath
@@ -119,8 +117,12 @@ public abstract class ExportCommandBase : DiscordCommandBase
     )]
     public string DateFormat { get; init; } = "MM/dd/yyyy h:mm tt";
 
-    [CommandOption("locale", Description = "Locale to use when formatting dates and numbers.")]
-    public string Locale { get; init; } = CultureInfo.CurrentCulture.Name;
+    [CommandOption(
+        "locale",
+        Description = "Locale to use when formatting dates and numbers. "
+            + "If not specified, the default system locale will be used."
+    )]
+    public string? Locale { get; init; }
 
     [CommandOption("utc", Description = "Normalize all timestamps to UTC+0.")]
     public bool IsUtcNormalizationEnabled { get; init; } = false;
@@ -163,19 +165,21 @@ public abstract class ExportCommandBase : DiscordCommandBase
             || OutputPath.Contains('%')
             // Otherwise, require an existing directory or an unambiguous directory path
             || Directory.Exists(OutputPath)
-            || PathEx.IsDirectoryPath(OutputPath);
+            || Path.EndsInDirectorySeparator(OutputPath);
 
         if (!isValidOutputPath)
         {
             throw new CommandException(
                 "Attempted to export multiple channels, but the output path is neither a directory nor a template. "
-                    + "If the provided output path is meant to be treated as a directory, make sure it ends with a slash."
+                    + "If the provided output path is meant to be treated as a directory, make sure it ends with a slash. "
+                    + $"Provided output path: '{OutputPath}'."
             );
         }
 
         // Export
         var cancellationToken = console.RegisterCancellationHandler();
         var errorsByChannel = new ConcurrentDictionary<Channel, string>();
+        var warningsByChannel = new ConcurrentDictionary<Channel, string>();
 
         await console.Output.WriteLineAsync($"Exporting {channels.Count} channel(s)...");
         await console
@@ -186,21 +190,21 @@ public abstract class ExportCommandBase : DiscordCommandBase
                 // https://github.com/Tyrrrz/DiscordChatExporter/issues/1124
                 ParallelLimit > 1
             )
-            .StartAsync(async progressContext =>
+            .StartAsync(async ctx =>
             {
                 await Parallel.ForEachAsync(
                     channels,
                     new ParallelOptions
                     {
                         MaxDegreeOfParallelism = Math.Max(1, ParallelLimit),
-                        CancellationToken = cancellationToken
+                        CancellationToken = cancellationToken,
                     },
                     async (channel, innerCancellationToken) =>
                     {
                         try
                         {
-                            await progressContext.StartTaskAsync(
-                                channel.GetHierarchicalName(),
+                            await ctx.StartTaskAsync(
+                                Markup.Escape(channel.GetHierarchicalName()),
                                 async progress =>
                                 {
                                     var guild = await Discord.GetGuildAsync(
@@ -233,6 +237,10 @@ public abstract class ExportCommandBase : DiscordCommandBase
                                 }
                             );
                         }
+                        catch (ChannelEmptyException ex)
+                        {
+                            warningsByChannel[channel] = ex.Message;
+                        }
                         catch (DiscordChatExporterException ex) when (!ex.IsFatal)
                         {
                             errorsByChannel[channel] = ex.Message;
@@ -249,6 +257,28 @@ public abstract class ExportCommandBase : DiscordCommandBase
             );
         }
 
+        // Print warnings
+        if (warningsByChannel.Any())
+        {
+            await console.Output.WriteLineAsync();
+
+            using (console.WithForegroundColor(ConsoleColor.Yellow))
+            {
+                await console.Error.WriteLineAsync(
+                    "Warnings reported for the following channel(s):"
+                );
+            }
+
+            foreach (var (channel, message) in warningsByChannel)
+            {
+                await console.Error.WriteAsync($"{channel.GetHierarchicalName()}: ");
+                using (console.WithForegroundColor(ConsoleColor.Yellow))
+                    await console.Error.WriteLineAsync(message);
+            }
+
+            await console.Error.WriteLineAsync();
+        }
+
         // Print errors
         if (errorsByChannel.Any())
         {
@@ -256,16 +286,14 @@ public abstract class ExportCommandBase : DiscordCommandBase
 
             using (console.WithForegroundColor(ConsoleColor.Red))
             {
-                await console.Error.WriteLineAsync(
-                    $"Failed to export {errorsByChannel.Count} channel(s):"
-                );
+                await console.Error.WriteLineAsync("Failed to export the following channel(s):");
             }
 
-            foreach (var (channel, error) in errorsByChannel)
+            foreach (var (channel, message) in errorsByChannel)
             {
                 await console.Error.WriteAsync($"{channel.GetHierarchicalName()}: ");
                 using (console.WithForegroundColor(ConsoleColor.Red))
-                    await console.Error.WriteLineAsync(error);
+                    await console.Error.WriteLineAsync(message);
             }
 
             await console.Error.WriteLineAsync();

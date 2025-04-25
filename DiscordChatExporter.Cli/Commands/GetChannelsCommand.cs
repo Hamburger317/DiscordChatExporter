@@ -7,15 +7,14 @@ using DiscordChatExporter.Cli.Commands.Base;
 using DiscordChatExporter.Cli.Commands.Converters;
 using DiscordChatExporter.Cli.Commands.Shared;
 using DiscordChatExporter.Core.Discord;
-using DiscordChatExporter.Core.Discord.Data;
 using DiscordChatExporter.Core.Utils.Extensions;
 
 namespace DiscordChatExporter.Cli.Commands;
 
-[Command("channels", Description = "Get the list of channels in a guild.")]
+[Command("channels", Description = "Get the list of channels in a server.")]
 public class GetChannelsCommand : DiscordCommandBase
 {
-    [CommandOption("guild", 'g', Description = "Guild ID.")]
+    [CommandOption("guild", 'g', Description = "Server ID.")]
     public required Snowflake GuildId { get; init; }
 
     [CommandOption("include-vc", Description = "Include voice channels.")]
@@ -59,7 +58,7 @@ public class GetChannelsCommand : DiscordCommandBase
                 )
                     .OrderBy(c => c.Name)
                     .ToArray()
-                : Array.Empty<Channel>();
+                : [];
 
         foreach (var channel in channels)
         {

@@ -1,9 +1,5 @@
 # Scheduling exports on macOS
 
-Scheduling on macOS is a bit tricky, but it should work if you follow the instructions accordingly.
-
-Make sure you already have **DiscordChatExporter.CLI** and **.NET Core** properly installed ([instructions here](https://github.com/Tyrrrz/DiscordChatExporter/blob/master/.docs/macOS-usage-instructions.md)).
-
 ## Creating the script
 
 1. Open TextEdit.app and create a new file
@@ -51,7 +47,7 @@ fi
 cd $DLLFOLDER || exit 1
 
 # This will export your chat
-dotnet DiscordChatExporter.Cli.dll export -t $TOKEN -c $CHANNELID -f $EXPORTFORMAT -o $FILENAME.tmp
+./DiscordChatExporter.Cli export -t $TOKEN -c $CHANNELID -f $EXPORTFORMAT -o $FILENAME.tmp
 
 # This sets the current time to a variable
 CURRENTTIME=$(date +"%Y-%m-%d-%H-%M-%S")
@@ -70,8 +66,8 @@ exit 0
 
 4. Replace:
 
-- `tokenhere` with your [Token](https://github.com/Tyrrrz/DiscordChatExporter/blob/master/.docs/Token-and-IDs.md)
-- `channelhere` with a [Channel ID](https://github.com/Tyrrrz/DiscordChatExporter/blob/master/.docs/Token-and-IDs.md)
+- `tokenhere` with your [Token](Token-and-IDs.md)
+- `channelhere` with a [Channel ID](Token-and-IDs.md)
 - `dceFOLDERpathhere` with DCE's **directory's path** (e.g. `/Users/user/Desktop/DiscordChatExporterFolder`, NOT `/Users/user/Desktop/DiscordChatExporterFolder/DiscordChatExporter.DLL`)
 - `filenamehere` with the exported channel's filename, without spaces
 - `dirhere` with the directory you want the files to be saved at (e.g. `/Users/user/Documents/Discord\ Exports`)
@@ -168,7 +164,7 @@ Omitted keys are interpreted as wildcards, for example, if you delete the Minute
 
 Be aware that if you set the day to '31', the script will only run on months that have the 31st day.
 
-**Check the examples below ([or skip to step 3 (loading the file)](https://github.com/Tyrrrz/DiscordChatExporter/blob/master/.docs/scheduling-MacOS.md#3-loading-the-plist-into-launchctl)):**
+**Check the examples below ([or skip to step 3 (loading the file)](#3-loading-the-plist-into-launchctl)):**
 
 Export everyday at 5:15 PM:
 

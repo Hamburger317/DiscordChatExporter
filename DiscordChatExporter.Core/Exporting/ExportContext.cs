@@ -8,31 +8,25 @@ using System.Threading;
 using System.Threading.Tasks;
 using DiscordChatExporter.Core.Discord;
 using DiscordChatExporter.Core.Discord.Data;
+using DiscordChatExporter.Core.Utils;
 using DiscordChatExporter.Core.Utils.Extensions;
 
 namespace DiscordChatExporter.Core.Exporting;
 
-internal class ExportContext
+internal class ExportContext(DiscordClient discord, ExportRequest request)
 {
     private readonly Dictionary<Snowflake, Member?> _membersById = new();
     private readonly Dictionary<Snowflake, Channel> _channelsById = new();
     private readonly Dictionary<Snowflake, Role> _rolesById = new();
-    private readonly ExportAssetDownloader _assetDownloader;
 
-    public DiscordClient Discord { get; }
+    private readonly ExportAssetDownloader _assetDownloader = new(
+        request.AssetsDirPath,
+        request.ShouldReuseAssets
+    );
 
-    public ExportRequest Request { get; }
+    public DiscordClient Discord { get; } = discord;
 
-    public ExportContext(DiscordClient discord, ExportRequest request)
-    {
-        Discord = discord;
-        Request = request;
-
-        _assetDownloader = new ExportAssetDownloader(
-            request.AssetsDirPath,
-            request.ShouldReuseAssets
-        );
-    }
+    public ExportRequest Request { get; } = request;
 
     public DateTimeOffset NormalizeDate(DateTimeOffset instant) =>
         Request.IsUtcNormalizationEnabled ? instant.ToUniversalTime() : instant.ToLocalTime();
@@ -101,11 +95,11 @@ internal class ExportContext
     public Role? TryGetRole(Snowflake id) => _rolesById.GetValueOrDefault(id);
 
     public IReadOnlyList<Role> GetUserRoles(Snowflake id) =>
-        TryGetMember(id)?.RoleIds
-            .Select(TryGetRole)
+        TryGetMember(id)
+            ?.RoleIds.Select(TryGetRole)
             .WhereNotNull()
             .OrderByDescending(r => r.Position)
-            .ToArray() ?? Array.Empty<Role>();
+            .ToArray() ?? [];
 
     public Color? TryGetUserColor(Snowflake id) =>
         GetUserRoles(id).Where(r => r.Color is not null).Select(r => r.Color).FirstOrDefault();
@@ -123,9 +117,9 @@ internal class ExportContext
             var filePath = await _assetDownloader.DownloadAsync(url, cancellationToken);
             var relativeFilePath = Path.GetRelativePath(Request.OutputDirPath, filePath);
 
-            // Prefer relative paths so that the output files can be copied around without breaking references.
-            // If the asset directory is outside of the export directory, use an absolute path instead.
-            var optimalFilePath =
+            // Prefer the relative path so that the export package can be copied around without breaking references.
+            // However, if the assets directory lies outside the export directory, use the absolute path instead.
+            var shouldUseAbsoluteFilePath =
                 relativeFilePath.StartsWith(
                     ".." + Path.DirectorySeparatorChar,
                     StringComparison.Ordinal
@@ -133,16 +127,13 @@ internal class ExportContext
                 || relativeFilePath.StartsWith(
                     ".." + Path.AltDirectorySeparatorChar,
                     StringComparison.Ordinal
-                )
-                    ? filePath
-                    : relativeFilePath;
+                );
+
+            var optimalFilePath = shouldUseAbsoluteFilePath ? filePath : relativeFilePath;
 
             // For HTML, the path needs to be properly formatted
             if (Request.Format is ExportFormat.HtmlDark or ExportFormat.HtmlLight)
-            {
-                // Create a 'file:///' URI and then strip the 'file:///' prefix to allow for relative paths
-                return new Uri(new Uri("file:///"), optimalFilePath).ToString()[8..];
-            }
+                return Url.EncodeFilePath(optimalFilePath);
 
             return optimalFilePath;
         }
