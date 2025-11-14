@@ -3,9 +3,9 @@ using DiscordChatExporter.Core.Discord.Data;
 
 namespace DiscordChatExporter.Core.Exporting.Partitioning;
 
-internal class DayPartitionLimit() : PartitionLimit
+internal class YearPartitionLimit() : PartitionLimit
 {
-    private DateTimeOffset? CurrentDay = null;
+    private DateTimeOffset? CurrentDate = null;
 
     // Fucking kill me my code is ASS
     private bool ForceSplitFlag = false;
@@ -17,11 +17,11 @@ internal class DayPartitionLimit() : PartitionLimit
         ForceSplitFlag = false;
 
         DateTimeOffset messageDate = context.NormalizeDate(message.Timestamp);
-        CurrentDay ??= messageDate;
+        CurrentDate ??= messageDate;
 
-        if (messageDate.Date != CurrentDay?.Date)
+        if (messageDate.Year != CurrentDate?.Year)
         {
-            CurrentDay = messageDate;
+            CurrentDate = messageDate;
             ForceSplitFlag = true;
         }
     }

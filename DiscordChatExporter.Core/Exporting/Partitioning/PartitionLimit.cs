@@ -62,6 +62,9 @@ public partial class PartitionLimit
         if (value.Equals("day"))
             return new DayPartitionLimit();
 
+        if (value.Equals("year"))
+            return new YearPartitionLimit();
+
         return null;
     }
 
