@@ -59,13 +59,13 @@ public partial class PartitionLimit
         if (int.TryParse(value, NumberStyles.Integer, formatProvider, out var messageCountLimit))
             return new MessageCountPartitionLimit(messageCountLimit);
 
-        if (value.Equals("day"))
-            return new DayPartitionLimit();
-
-        if (value.Equals("year"))
-            return new YearPartitionLimit();
-
-        return null;
+        return value switch
+        {
+            "day" => new DayPartitionLimit(),
+            "month" => new MonthPartitionLimit(),
+            "year" => new YearPartitionLimit(),
+            _ => null,
+        };
     }
 
     public static PartitionLimit Parse(string value, IFormatProvider? formatProvider = null) =>
