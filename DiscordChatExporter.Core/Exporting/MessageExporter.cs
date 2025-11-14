@@ -65,8 +65,11 @@ internal partial class MessageExporter(ExportContext context) : IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
+        context.Request.PartitionLimit.Update(message, context);
+
         var writer = await InitializeWriterAsync(cancellationToken);
         await writer.WriteMessageAsync(message, cancellationToken);
+
         MessagesExported++;
     }
 
