@@ -59,7 +59,7 @@ public abstract class ExportCommandBase : DiscordCommandBase
         "partition",
         'p',
         Description = "Split the output into partitions, each limited to the specified "
-            + "number of messages (e.g. '100') or file size (e.g. '10mb')."
+            + "number of messages (e.g. '100'), file size (e.g. '10mb') or unit of time (e.g 'day')."
     )]
     public PartitionLimit PartitionLimit { get; init; } = PartitionLimit.Null;
 

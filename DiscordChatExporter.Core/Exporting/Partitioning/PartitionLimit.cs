@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using DiscordChatExporter.Core.Discord.Data;
 
 namespace DiscordChatExporter.Core.Exporting.Partitioning;
 
 public abstract partial class PartitionLimit
 {
     public abstract bool IsReached(long messagesWritten, long bytesWritten);
+    public abstract void Update(Message message, ExportContext context);
 }
 
 public partial class PartitionLimit
@@ -57,7 +59,13 @@ public partial class PartitionLimit
         if (int.TryParse(value, NumberStyles.Integer, formatProvider, out var messageCountLimit))
             return new MessageCountPartitionLimit(messageCountLimit);
 
-        return null;
+        return value switch
+        {
+            "day" => new DayPartitionLimit(),
+            "month" => new MonthPartitionLimit(),
+            "year" => new YearPartitionLimit(),
+            _ => null,
+        };
     }
 
     public static PartitionLimit Parse(string value, IFormatProvider? formatProvider = null) =>

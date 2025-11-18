@@ -43,7 +43,6 @@ internal class PlainTextMessageWriter(Stream stream, ExportContext context)
         if (message.IsPinned)
             await _writer.WriteAsync(" (pinned)");
 
-
         await _writer.WriteLineAsync();
     }
 

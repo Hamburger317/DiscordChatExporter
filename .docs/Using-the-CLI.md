@@ -133,7 +133,7 @@ Here is the full list of supported template tokens:
 
 #### Partitioning
 
-You can use partitioning to split files after a given number of messages or file size.
+You can use partitioning to split files after a given number of messages, file size or unit of time.
 For example, a channel with 36 messages set to be partitioned every 10 messages will output 4 files.
 
 ```console
@@ -144,6 +144,11 @@ A 45 MB channel set to be partitioned every 20 MB will output 3 files.
 
 ```console
 ./DiscordChatExporter.Cli export -t "mfa.Ifrn" -c 53555 -p 20mb
+```
+
+And a decently active channel that has existed over the course of 7 days will output 7 files.
+```console
+./DiscordChatExporter.Cli export -t "mra.Ifrn" -c 53555 -p day
 ```
 
 #### Downloading assets
