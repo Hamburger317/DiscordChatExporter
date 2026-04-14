@@ -45,7 +45,11 @@ public partial record Embed
         var title = json.GetPropertyOrNull("title")?.GetStringOrNull();
 
         var kind =
-            json.GetPropertyOrNull("type")?.GetStringOrNull()?.ParseEnumOrNull<EmbedKind>()
+            json.GetPropertyOrNull("type")
+                ?.GetStringOrNull()
+                ?.Pipe(s =>
+                    Enum.TryParse<EmbedKind>(s, true, out var result) ? result : (EmbedKind?)null
+                )
             ?? EmbedKind.Rich;
 
         var url = json.GetPropertyOrNull("url")?.GetNonWhiteSpaceStringOrNull();
@@ -63,7 +67,8 @@ public partial record Embed
             json.GetPropertyOrNull("fields")
                 ?.EnumerateArrayOrNull()
                 ?.Select(EmbedField.Parse)
-                .ToArray() ?? [];
+                .ToArray()
+            ?? [];
 
         var thumbnail = json.GetPropertyOrNull("thumbnail")?.Pipe(EmbedImage.Parse);
 
@@ -78,7 +83,8 @@ public partial record Embed
             json.GetPropertyOrNull("image")
                 ?.Pipe(EmbedImage.Parse)
                 .ToSingletonEnumerable()
-                .ToArray() ?? [];
+                .ToArray()
+            ?? [];
 
         var video = json.GetPropertyOrNull("video")?.Pipe(EmbedVideo.Parse);
 

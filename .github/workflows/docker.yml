@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - master
+      - prime
     tags:
       - "*"
   pull_request:
     branches:
-      - master
+      - prime
 
 jobs:
   # Outputs from this job aren't really used, but it's here to verify that the Dockerfile builds correctly
@@ -23,10 +23,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Install Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
       - name: Build image
         run: >
@@ -37,15 +37,15 @@ jobs:
           --output type=tar,dest=DiscordChatExporter.Cli.Docker.tar
 
       - name: Upload image
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: DiscordChatExporter.Cli.Docker
           path: DiscordChatExporter.Cli.Docker.tar
           if-no-files-found: error
 
   deploy:
-    # Deploy to DockerHub only on tag push or master branch push
-    if: ${{ github.ref_type == 'tag' || github.ref_type == 'branch' && github.ref_name == 'master' }}
+    # Deploy to DockerHub only on tag push or prime branch push
+    if: ${{ github.ref_type == 'tag' || github.ref_type == 'branch' && github.ref_name == 'prime' }}
 
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -55,10 +55,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Install Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
       - name: Login to DockerHub
         run: >
